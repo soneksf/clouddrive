@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<settings>
+  <sort field="created_at" order="desc"/>
+  <filter>xml_png</filter>
+</settings>

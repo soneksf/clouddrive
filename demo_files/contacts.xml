@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<contacts>
+  <person id="1">
+    <name>Софія</name>
+    <role>Власник диска</role>
+  </person>
+  <person id="2">
+    <name>Іван</name>
+    <role>Колега</role>
+  </person>
+</contacts>
