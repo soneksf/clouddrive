@@ -16,18 +16,24 @@ DEMO_USERS = [
 ]
 
 
-def main() -> None:
-    print("Підключення:", DATABASE_URL)
+def ensure_schema_and_users(verbose: bool = True) -> None:
+    """Створює таблиці й демонстраційних користувачів. Безпечно викликати повторно."""
     Base.metadata.create_all(engine)
-    print("Таблиці users і files створено (якщо їх не було).")
-
+    if verbose:
+        print("Таблиці створено (якщо їх не було).")
     with SessionLocal() as db:
         for login, full_name, password in DEMO_USERS:
             if db.scalar(select(User).where(User.login == login)) is None:
                 db.add(User(login=login, full_name=full_name,
                             password_hash=hash_password(password)))
-                print(f"  + користувач {login} / {password}")
+                if verbose:
+                    print(f"  + користувач {login} / {password}")
         db.commit()
+
+
+def main() -> None:
+    print("Підключення:", DATABASE_URL)
+    ensure_schema_and_users()
     print("Готово.")
 
 

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CloudDrive — вхід</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="login-page">
+  <form class="login-card" id="login-form" autocomplete="off">
+    <h1>CloudDrive</h1>
+    <p class="sub">Авторизація на віддаленому сервері</p>
+
+    <div class="error" id="error"></div>
+
+    <label for="login">Логін</label>
+    <input type="text" id="login" value="sofiia" required>
+
+    <label for="password">Пароль</label>
+    <input type="password" id="password" value="qwerty123" required>
+
+    <button type="submit" class="primary" id="submit">Увійти</button>
+
+    <p class="hint">Демонстраційні облікові записи: sofiia / qwerty123, ivan / qwerty123</p>
+  </form>
+
+  <script src="api.js"></script>
+  <script>
+    const form = document.getElementById("login-form");
+    const errorBox = document.getElementById("error");
+    const submit = document.getElementById("submit");
+
+    // якщо токен уже збережено — одразу в кабінет
+    if (Api.getToken()) {
+      window.location.replace("index.html");
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.classList.remove("visible");
+      submit.disabled = true;
+      submit.textContent = "Вхід…";
+      try {
+        await Api.login(document.getElementById("login").value.trim(),
+                        document.getElementById("password").value);
+        window.location.href = "index.html";
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.classList.add("visible");
+      } finally {
+        submit.disabled = false;
+        submit.textContent = "Увійти";
+      }
+    });
+  </script>
+</body>
+</html>

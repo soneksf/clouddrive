@@ -2,7 +2,8 @@
 """Моделі БД — реалізація доменної діаграми класів етапу 1."""
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (BigInteger, DateTime, ForeignKey, Integer, LargeBinary, String,
+                        UniqueConstraint)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
@@ -56,3 +57,13 @@ class FileEntry(Base):
 
     def __repr__(self) -> str:
         return f"<FileEntry {self.name}>"
+
+
+class FileBlob(Base):
+    """Вміст файлу в БД. Використовується, коли STORAGE_BACKEND = "db"
+    (публікація в інтернеті, де файлова система сервера тимчасова)."""
+    __tablename__ = "file_blobs"
+
+    file_id: Mapped[int] = mapped_column(
+        ForeignKey("files.id", ondelete="CASCADE"), primary_key=True)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)

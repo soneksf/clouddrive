@@ -1,0 +1,22 @@
+# Blueprint для публікації CloudDrive на Render.
+# База даних — окремо на Neon (безкоштовний постійний план),
+# її рядок підключення вказується у змінній DATABASE_URL.
+services:
+  - type: web
+    name: clouddrive
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: STORAGE_BACKEND     # вміст файлів зберігаємо в БД, бо диск тимчасовий
+        value: db
+      - key: INIT_DB_ON_START    # створити таблиці й демо-користувачів при старті
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL        # вставити рядок підключення з Neon у налаштуваннях Render
+        sync: false

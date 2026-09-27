@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CloudDrive — кабінет користувача</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <h1>CloudDrive — віртуальний диск</h1>
+    <span class="spacer"></span>
+    <span class="user" id="user-name"></span>
+    <button id="btn-logout">Вийти</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="group">
+      <button id="btn-upload" class="primary">Завантажити на сервер</button>
+      <input type="file" id="file-input" multiple hidden>
+      <button id="btn-download" disabled>Вивантажити на диск</button>
+      <button id="btn-delete" class="danger" disabled>Видалити</button>
+      <button id="btn-refresh">Оновити</button>
+    </div>
+
+    <div class="group">
+      <label for="filter">Фільтр:</label>
+      <select id="filter">
+        <option value="all">Усі файли</option>
+        <option value="xml_png">Лише .xml і .png</option>
+      </select>
+    </div>
+
+    <div class="group columns-menu" id="columns-menu">
+      <button id="btn-columns">Стовпці ▾</button>
+      <div class="items" id="columns-items"></div>
+    </div>
+
+    <span class="spacer"></span>
+    <span class="sort-state" id="sort-state"></span>
+  </div>
+
+  <p class="dropzone-hint">
+    Файли можна перетягнути з провідника просто в таблицю (drag-and-drop).
+  </p>
+
+  <main class="workspace">
+    <div class="table-wrap" id="table-wrap">
+      <table id="files-table">
+        <thead>
+          <tr id="head-row"></tr>
+        </thead>
+        <tbody id="files-body">
+          <tr><td class="empty" colspan="7">Завантаження списку…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section class="preview">
+      <h2 id="preview-title">Перегляд вмісту</h2>
+      <div id="preview-body" class="placeholder">
+        Клікніть по файлу .xml або .png, щоб побачити вміст
+      </div>
+    </section>
+  </main>
+
+  <div class="status" id="status">Готово</div>
+
+  <script src="api.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -20,11 +20,27 @@ def _load_env_file() -> None:
 
 _load_env_file()
 
-# Рядок підключення до PostgreSQL
-DATABASE_URL = os.environ.get(
+# Рядок підключення до PostgreSQL.
+# Хмарні провайдери (Neon, Render) видають URL у вигляді postgresql://...,
+# а SQLAlchemy має знати драйвер — тому підставляємо +psycopg автоматично.
+def _normalize(url: str) -> str:
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
+
+
+DATABASE_URL = _normalize(os.environ.get(
     "DATABASE_URL",
     "postgresql+psycopg://postgres:postgres@localhost:5432/clouddrive",
-)
+))
+
+# Де зберігати вміст файлів: "disk" (локально) або "db" (публікація в інтернеті)
+STORAGE_BACKEND = os.environ.get("STORAGE_BACKEND", "disk").strip().lower()
+
+# Створювати таблиці й демо-користувачів при старті сервера (потрібно в хмарі)
+INIT_DB_ON_START = os.environ.get("INIT_DB_ON_START", "0").strip() in ("1", "true", "yes")
 
 # Тека, у якій сервер зберігає вміст файлів (вузол :FileStorage на діаграмі розгортання)
 STORAGE_DIR = Path(os.environ.get("STORAGE_DIR", str(BASE_DIR / "server_storage")))
