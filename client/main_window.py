@@ -85,6 +85,11 @@ class MainWindow(QMainWindow):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().sectionClicked.connect(self.on_header_clicked)
         self.table.clicked.connect(self.on_row_clicked)
+        # drag-and-drop має працювати і над таблицею, тому вимикаємо власну
+        # обробку перетягування в QTableView і віддаємо події головному вікну
+        self.table.setAcceptDrops(False)
+        self.table.setDragDropMode(QAbstractItemView.NoDragDrop)
+        self.table.viewport().setAcceptDrops(False)
 
         # ---- панель перегляду вмісту (.xml як текст, .png як зображення)
         self.preview_text = QTextEdit()
@@ -144,7 +149,10 @@ class MainWindow(QMainWindow):
         try:
             files = self.controller.refresh() if from_server else self.controller.visible_files()
         except ApiError as exc:
-            QMessageBox.critical(self, "Помилка", str(exc))
+            # показуємо те, що є в кеші, але повідомляємо про проблему
+            files = self.controller.visible_files()
+            self.model.set_files(files)
+            QMessageBox.critical(self, "Помилка оновлення списку", str(exc))
             return
         self.model.set_files(files)
         arrow = "▲" if self.controller.sort_order is SortOrder.ASC else "▼"
@@ -177,7 +185,16 @@ class MainWindow(QMainWindow):
         try:
             data = self.api.download_bytes(meta.id)
         except ApiError as exc:
-            QMessageBox.warning(self, "Помилка", str(exc))
+            if "404" in str(exc):
+                # файл уже видалено — оновлюємо список, щоб таблиця не брехала
+                QMessageBox.information(self, "Файл недоступний",
+                                        f"Файлу «{meta.name}» більше немає на сервері. "
+                                        "Список буде оновлено.")
+                self.reload(from_server=True)
+            else:
+                QMessageBox.warning(self, "Помилка", str(exc))
+            self.preview_stack.setCurrentIndex(0)
+            self.preview_title.setText("Перегляд вмісту")
             return
         if kind is PreviewKind.TEXT:
             # .xml показується саме як текст, а не як відрендерена розмітка
@@ -199,17 +216,23 @@ class MainWindow(QMainWindow):
     def _upload_paths(self, paths) -> None:
         if not paths:
             return
-        sent = 0
+        sent, skipped = 0, []
         for path in paths:
             if not path.is_file():
+                skipped.append(f"{path.name} — це тека, а не файл")
                 continue
             try:
                 self.api.upload(path)
                 sent += 1
-            except ApiError as exc:
-                QMessageBox.warning(self, "Помилка завантаження", f"{path.name}: {exc}")
-        self.statusBar().showMessage(f"Завантажено файлів: {sent}", 5000)
+            except (ApiError, OSError) as exc:
+                skipped.append(f"{path.name}: {exc}")
         self.reload(from_server=True)
+        if skipped:
+            QMessageBox.warning(self, "Завантаження",
+                                "Завантажено файлів: {}\n\nНе вдалося:\n{}".format(
+                                    sent, "\n".join(skipped)))
+        else:
+            self.statusBar().showMessage(f"Завантажено файлів: {sent}", 5000)
 
     def download_selected(self) -> None:
         rows = {i.row() for i in self.table.selectionModel().selectedRows()}
@@ -228,20 +251,35 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"Збережено у {folder}", 5000)
 
     def delete_selected(self) -> None:
-        rows = {i.row() for i in self.table.selectionModel().selectedRows()}
-        if not rows:
+        metas = [self.model.file_at(i.row())
+                 for i in self.table.selectionModel().selectedRows()]
+        if not metas:
+            QMessageBox.information(self, "Видалення", "Оберіть хоча б один файл")
             return
-        names = ", ".join(self.model.file_at(r).name for r in rows)
+        names = ", ".join(m.name for m in metas)
         answer = QMessageBox.question(self, "Видалення", f"Видалити: {names}?")
-        if answer != QMessageBox.Yes:
+        if answer != QMessageBox.StandardButton.Yes:
             return
-        for row in rows:
-            meta = self.model.file_at(row)
+
+        removed, errors = [], []
+        for meta in metas:
             try:
                 self.api.delete(meta.id)
+                removed.append(meta.id)
             except ApiError as exc:
-                QMessageBox.warning(self, "Помилка", f"{meta.name}: {exc}")
+                if "404" in str(exc):        # запису вже немає — теж прибираємо з таблиці
+                    removed.append(meta.id)
+                else:
+                    errors.append(f"{meta.name}: {exc}")
+        # прибираємо з кешу одразу, щоб рядок зник навіть якщо оновлення зірветься
+        self.controller.cache = [f for f in self.controller.cache if f.id not in removed]
+        self.preview_stack.setCurrentIndex(0)
+        self.preview_title.setText("Перегляд вмісту")
         self.reload(from_server=True)
+        if errors:
+            QMessageBox.warning(self, "Видалення", "\n".join(errors))
+        else:
+            self.statusBar().showMessage(f"Видалено файлів: {len(removed)}", 5000)
 
     def open_sync(self) -> None:
         dialog = SyncDialog(self.api, self)
@@ -252,8 +290,29 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event) -> None:
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
+            self.statusBar().showMessage("Відпустіть файли, щоб завантажити їх на сервер")
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event) -> None:
+        # без цього обробника Qt не дозволяє відпустити файл над таблицею
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event) -> None:
+        self.statusBar().clearMessage()
 
     def dropEvent(self, event) -> None:
-        paths = [Path(url.toLocalFile()) for url in event.mimeData().urls()]
-        self._upload_paths(paths)
+        paths = []
+        for url in event.mimeData().urls():
+            local = url.toLocalFile()
+            if local:
+                paths.append(Path(local))
         event.acceptProposedAction()
+        if not paths:
+            QMessageBox.information(self, "Завантаження",
+                                    "Перетягнути можна лише файли з диска")
+            return
+        self._upload_paths(paths)
